@@ -1,9 +1,10 @@
 {
-  "name": "Tarjetas VR",
-  "short_name": "Tarjetas VR",
+  "name": "Tarjeta Digital",
+  "short_name": "Tarjeta QR",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#090d16",
-  "theme_color": "#0f172a"
+  "background_color": "#FFFFFF",
+  "theme_color": "#E4002B",
+  "icons": [{ "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }]
 }
