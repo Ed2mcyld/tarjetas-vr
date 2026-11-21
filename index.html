@@ -164,6 +164,19 @@
       </div>
 
       <div class="card">
+        <div class="card-title">Dirección</div>
+        <div class="form-group"><label for="adr_street">Calle y número</label><input type="text" id="adr_street" placeholder="Av. Amazonas N34-120 y Atahualpa" autocomplete="street-address" /></div>
+        <div class="grid-2">
+          <div class="form-group"><label for="adr_city">Ciudad</label><input type="text" id="adr_city" placeholder="Quito" autocomplete="address-level2" /></div>
+          <div class="form-group"><label for="adr_region">Provincia</label><input type="text" id="adr_region" placeholder="Pichincha" autocomplete="address-level1" /></div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label for="adr_zip">Código postal</label><input type="text" id="adr_zip" placeholder="170135" autocomplete="postal-code" inputmode="numeric" /></div>
+          <div class="form-group"><label for="adr_country">País</label><input type="text" id="adr_country" placeholder="Ecuador" autocomplete="country-name" /></div>
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-title">Redes Sociales y Web</div>
         <div class="form-group"><label for="social_website">Sitio Web</label><input type="url" id="social_website" placeholder="miweb.com" autocapitalize="off" autocorrect="off" /></div>
         <div class="form-group"><label for="social_linkedin">LinkedIn</label><input type="text" id="social_linkedin" placeholder="usuario o https://linkedin.com/in/usuario" autocapitalize="off" autocorrect="off" /></div>
@@ -613,6 +626,7 @@
       "use strict";
       var $ = function (id) { return document.getElementById(id); };
       var FIELDS = ['firstName', 'lastName', 'phone', 'email', 'org', 'title',
+                    'adr_street', 'adr_city', 'adr_region', 'adr_zip', 'adr_country',
                     'social_website', 'social_linkedin', 'social_instagram'];
       var STORAGE_KEY = 'tarjetasvr:v2';
       var canvas = $('qrCanvas');
@@ -728,6 +742,10 @@
         if (v.title) lines.push('TITLE:' + esc(v.title));
         if (v.phone) lines.push('TEL;TYPE=CELL:' + v.phone.replace(/[^\d+]/g, ''));
         if (v.email) lines.push('EMAIL;TYPE=INTERNET:' + v.email);
+        if (v.adr_street || v.adr_city || v.adr_region || v.adr_zip || v.adr_country) {
+          // ADR: apartado;extendida;calle;ciudad;provincia;código postal;país
+          lines.push('ADR;TYPE=WORK:;;' + [v.adr_street, v.adr_city, v.adr_region, v.adr_zip, v.adr_country].map(esc).join(';'));
+        }
         if (web) lines.push('URL:' + web);
         if (linkedin) lines.push('X-SOCIALPROFILE;TYPE=linkedin:' + linkedin);
         if (instagram) lines.push('X-SOCIALPROFILE;TYPE=instagram:' + instagram);
