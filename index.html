@@ -116,6 +116,16 @@
     .btn-ghost { background: #1e293b; color: #f1f5f9; }
 
     /* Vista para guardar imagen en iOS (mantener pulsado → Guardar en Fotos) */
+    #vcfOverlay {
+      position: fixed; inset: 0; z-index: 10;
+      background: rgba(0,0,0,0.92);
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      padding: 24px; text-align: center; gap: 4px;
+    }
+    #vcfOverlay.open { display: flex; }
+    #vcfOverlay .btn { max-width: 360px; }
+    #vcfOverlay p { color: #e2e8f0; font-size: 1rem; margin-bottom: 8px; }
+    #vcfOverlay .hint { font-size: 0.85rem; color: #94a3b8; max-width: 360px; margin: 10px 0; }
     #saveOverlay {
       position: fixed; inset: 0; z-index: 10;
       background: rgba(0,0,0,0.92);
@@ -216,6 +226,14 @@
     <img id="saveImg" alt="Código QR" />
     <p>Mantén pulsada la imagen y elige <b>“Guardar en Fotos”</b>.</p>
     <button class="btn btn-ghost" id="closeOverlayBtn" type="button">Cerrar</button>
+  </div>
+
+  <div id="vcfOverlay" class="overlay" role="dialog" aria-modal="true">
+    <p><b>Guardar contacto</b></p>
+    <button class="btn btn-success" id="vcfOpenBtn" type="button">Abrir en Contactos</button>
+    <button class="btn btn-primary" id="vcfShareBtn" type="button">Compartir / Guardar en Archivos</button>
+    <p class="hint" id="vcfHint">“Abrir en Contactos” muestra la ficha: toca <b>Crear contacto nuevo</b>.</p>
+    <button class="btn btn-ghost" id="vcfCloseBtn" type="button">Cancelar</button>
   </div>
 
   <!--
@@ -862,13 +880,35 @@
       $('downloadVcfBtn').addEventListener('click', function () {
         var vcard = buildVCardString();
         var filename = fileBase() + '.vcf';
+        var blob = new Blob([vcard], { type: 'text/vcard;charset=utf-8' });
         if (isIOS) {
-          // En iPhone, abrir la vCard muestra directamente la ficha "Crear contacto nuevo"
-          window.location.href = 'data:text/vcard;charset=utf-8,' + encodeURIComponent(vcard);
+          // Safari en iPhone bloquea las direcciones data:, así que damos dos caminos
+          pendingVcf = { blob: blob, filename: filename };
+          $('vcfOverlay').classList.add('open');
         } else {
-          downloadBlob(new Blob([vcard], { type: 'text/vcard;charset=utf-8' }), filename);
+          downloadBlob(blob, filename);
         }
       });
+
+      var pendingVcf = null;
+      // Opción 1: abrir la vCard → iOS muestra la ficha con "Crear contacto nuevo"
+      $('vcfOpenBtn').addEventListener('click', function () {
+        if (!pendingVcf) return;
+        var url = URL.createObjectURL(new Blob([pendingVcf.blob], { type: 'text/x-vcard' }));
+        $('vcfOverlay').classList.remove('open');
+        window.location.href = url;
+        setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+      });
+      // Opción 2: hoja de compartir → Contactos, WhatsApp, Mail, Guardar en Archivos…
+      $('vcfShareBtn').addEventListener('click', function () {
+        if (!pendingVcf) return;
+        var f = pendingVcf;
+        tryShareFile(new Blob([f.blob], { type: 'text/vcard' }), f.filename).then(function (ok) {
+          if (ok) { $('vcfOverlay').classList.remove('open'); return; }
+          $('vcfHint').textContent = 'Este iPhone no permite compartir archivos desde aquí. Usa “Abrir en Contactos”.';
+        });
+      });
+      $('vcfCloseBtn').addEventListener('click', function () { $('vcfOverlay').classList.remove('open'); });
 
       // ---------- Logo ----------
       $('logoInput').addEventListener('change', function (e) {
