@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Tarjetas VR</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Tarjetas VR" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="manifest" href="manifest.json" />
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #090d16;
+      color: #f1f5f9;
+      padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(16px, env(safe-area-inset-left));
+      min-height: 100vh;
+      -webkit-tap-highlight-color: transparent;
+    }
+    header {
+      padding: 16px 0;
+      margin-bottom: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .title { font-size: 1.2rem; font-weight: bold; color: #ffffff; }
+    .subtitle { font-size: 0.8rem; color: #94a3b8; }
+    main {
+      max-width: 1000px;
+      margin: 0 auto 24px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+    @media (min-width: 768px) { main { grid-template-columns: 1fr 1fr; } }
+    section { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+    .card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 16px;
+      padding: 20px;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #38bdf8;
+      margin-bottom: 16px;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 8px;
+    }
+    .form-group { margin-bottom: 14px; min-width: 0; }
+    label { display: block; font-size: 0.8rem; color: #94a3b8; margin-bottom: 6px; }
+    /* 16px evita el zoom automático de iOS al enfocar un campo */
+    input {
+      width: 100%;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #ffffff;
+      font-size: 16px;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    input[type="file"] { padding: 8px; font-size: 14px; }
+    input:focus { border-color: #38bdf8; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 380px) { .grid-2 { grid-template-columns: 1fr; gap: 0; } }
+    .qr-container {
+      background: #ffffff;
+      padding: 12px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 16px 0;
+    }
+    #qrCanvas { width: 100%; max-width: 320px; height: auto; display: block; image-rendering: pixelated; }
+    .status { font-size: 0.8rem; color: #94a3b8; min-height: 1.2em; }
+    .status.error { color: #f87171; }
+    input[type="range"] { padding: 0; height: 28px; background: transparent; border: none; -webkit-appearance: auto; appearance: auto; accent-color: #38bdf8; }
+    .check { display: flex; align-items: center; gap: 10px; font-size: 0.95rem; color: #f1f5f9; cursor: pointer; }
+    .check input { width: 22px; height: 22px; padding: 0; -webkit-appearance: auto; appearance: auto; accent-color: #38bdf8; }
+    .color-row { display: flex; align-items: center; gap: 10px; }
+    .color-row input[type="color"] {
+      width: 52px; height: 44px; padding: 4px; flex: none; cursor: pointer;
+      -webkit-appearance: none; appearance: none;
+    }
+    .color-row input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    .color-row input[type="color"]::-webkit-color-swatch { border: none; border-radius: 6px; }
+    .color-row span { font-family: ui-monospace, Menlo, monospace; font-size: 0.85rem; color: #cbd5e1; }
+    .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+    .presets button {
+      border: 1px solid #334155; border-radius: 999px; padding: 8px 14px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .status.warn { color: #fbbf24; }
+    .btn {
+      width: 100%;
+      padding: 14px 12px;
+      border-radius: 8px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      font-size: 16px;
+      -webkit-appearance: none;
+    }
+    .btn-primary { background: #38bdf8; color: #0f172a; }
+    .btn-success { background: #10b981; color: #ffffff; }
+    .btn-ghost { background: #1e293b; color: #f1f5f9; }
+
+    /* Vista para guardar imagen en iOS (mantener pulsado → Guardar en Fotos) */
+    #saveOverlay {
+      position: fixed; inset: 0; z-index: 10;
+      background: rgba(0,0,0,0.92);
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      padding: 24px; text-align: center; gap: 16px;
+    }
+    #saveOverlay.open { display: flex; }
+    #saveOverlay img { width: 100%; max-width: 360px; background: #fff; border-radius: 12px; -webkit-touch-callout: default; }
+    #saveOverlay p { color: #e2e8f0; font-size: 0.95rem; }
+    #saveOverlay .btn { max-width: 360px; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="title">Tarjetas VR</div>
+    <div class="subtitle">vCard QR Offline (iOS y Android)</div>
+  </header>
+
+  <main>
+    <section>
+      <div class="card">
+        <div class="card-title">Información Personal</div>
+        <div class="grid-2">
+          <div class="form-group"><label for="firstName">Nombre</label><input type="text" id="firstName" placeholder="Carlos" autocomplete="given-name" /></div>
+          <div class="form-group"><label for="lastName">Apellido</label><input type="text" id="lastName" placeholder="Rodríguez" autocomplete="family-name" /></div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label for="phone">Teléfono</label><input type="tel" id="phone" placeholder="+593 99 000 0000" autocomplete="tel" /></div>
+          <div class="form-group"><label for="email">Email</label><input type="email" id="email" placeholder="carlos@empresa.com" autocomplete="email" autocapitalize="off" /></div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label for="org">Empresa</label><input type="text" id="org" placeholder="VR Tech Solutions" autocomplete="organization" /></div>
+          <div class="form-group"><label for="title">Cargo</label><input type="text" id="title" placeholder="Gerente Comercial" autocomplete="organization-title" /></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Redes Sociales y Web</div>
+        <div class="form-group"><label for="social_website">Sitio Web</label><input type="url" id="social_website" placeholder="miweb.com" autocapitalize="off" autocorrect="off" /></div>
+        <div class="form-group"><label for="social_linkedin">LinkedIn</label><input type="text" id="social_linkedin" placeholder="usuario o https://linkedin.com/in/usuario" autocapitalize="off" autocorrect="off" /></div>
+        <div class="form-group"><label for="social_instagram">Instagram</label><input type="text" id="social_instagram" placeholder="@usuario" autocapitalize="off" autocorrect="off" /></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Imagen Central</div>
+        <div class="form-group">
+          <label for="logoInput">Imagen o logo (JPG / PNG)</label>
+          <input type="file" id="logoInput" accept="image/*" />
+        </div>
+        <div class="form-group">
+          <label for="logoSize">Tamaño de la imagen: <span id="logoSizeVal">20</span>%</label>
+          <input type="range" id="logoSize" min="12" max="28" step="1" value="20" />
+        </div>
+        <div class="form-group">
+          <label class="check"><input type="checkbox" id="logoRound" /> Imagen redonda</label>
+        </div>
+        <button class="btn btn-ghost" id="clearLogoBtn" type="button">Quitar imagen</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Colores</div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="bgColor">Color de fondo</label>
+            <div class="color-row"><input type="color" id="bgColor" value="#ffffff" /><span id="bgColorVal">#FFFFFF</span></div>
+          </div>
+          <div class="form-group">
+            <label for="fgColor">Color del código</label>
+            <div class="color-row"><input type="color" id="fgColor" value="#0f172a" /><span id="fgColorVal">#0F172A</span></div>
+          </div>
+        </div>
+        <div class="presets" id="presets">
+          <button type="button" data-bg="#ffffff" data-fg="#0f172a" style="background:#ffffff;color:#0f172a">Clásico</button>
+          <button type="button" data-bg="#e0f2fe" data-fg="#0c4a6e" style="background:#e0f2fe;color:#0c4a6e">Azul</button>
+          <button type="button" data-bg="#fef3c7" data-fg="#7c2d12" style="background:#fef3c7;color:#7c2d12">Arena</button>
+          <button type="button" data-bg="#dcfce7" data-fg="#14532d" style="background:#dcfce7;color:#14532d">Verde</button>
+          <button type="button" data-bg="#fee2e2" data-fg="#7f1d1d" style="background:#fee2e2;color:#7f1d1d">Rojo</button>
+        </div>
+        <div class="status" id="contrastMsg"></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="card" style="text-align: center;">
+        <div class="card-title">Vista Previa Código QR</div>
+        <div class="qr-container">
+          <canvas id="qrCanvas" width="320" height="320"></canvas>
+        </div>
+        <div class="status" id="status"></div>
+        <button class="btn btn-primary" id="downloadPngBtn" type="button">Guardar Imagen PNG</button>
+        <button class="btn btn-success" id="downloadVcfBtn" type="button">Descargar Contacto (.VCF)</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="saveOverlay" role="dialog" aria-modal="true">
+    <img id="saveImg" alt="Código QR" />
+    <p>Mantén pulsada la imagen y elige <b>“Guardar en Fotos”</b>.</p>
+    <button class="btn btn-ghost" id="closeOverlayBtn" type="button">Cerrar</button>
+  </div>
+
+  <!--
+    Motor QR: adaptación del generador "QR Code generator library" de Project Nayuki (licencia MIT).
+    Solo modo byte (UTF-8), suficiente para vCard.
+  -->
+  <script>
+    var qrcodegen = (function () {
+      "use strict";
+
+      var Ecc = {
+        LOW:      { ordinal: 0, formatBits: 1 },
+        MEDIUM:   { ordinal: 1, formatBits: 0 },
+        QUARTILE: { ordinal: 2, formatBits: 3 },
+        HIGH:     { ordinal: 3, formatBits: 2 }
+      };
+
+      var ECC_CODEWORDS_PER_BLOCK = [
+        [-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+        [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
+        [-1, 13, 22, 18, 26, 18, 24, 18, 22, 20, 24, 28, 26, 24, 20, 30, 24, 28, 28, 26, 30, 28, 30, 30, 30, 30, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+        [-1, 17, 28, 22, 16, 22, 28, 26, 26, 24, 28, 24, 28, 22, 24, 24, 30, 28, 28, 26, 28, 30, 24, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30]
+      ];
+      var NUM_ERROR_CORRECTION_BLOCKS = [
+        [-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25],
+        [-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49],
+        [-1, 1, 1, 2, 2, 4, 4, 6, 6, 8, 8, 8, 10, 12, 16, 12, 17, 16, 18, 21, 20, 23, 23, 25, 27, 29, 34, 34, 35, 38, 40, 43, 45, 48, 51, 53, 56, 59, 62, 65, 68],
+        [-1, 1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18, 16, 19, 21, 25, 25, 25, 34, 30, 32, 35, 37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 70, 74, 77, 81]
+      ];
+
+      function getBit(x, i) { return ((x >>> i) & 1) !== 0; }
+
+      function appendBits(val, len, bb) {
+        for (var i = len - 1; i >= 0; i--) bb.push((val >>> i) & 1);
+      }
+
+      function getNumRawDataModules(ver) {
+        var result = (16 * ver + 128) * ver + 64;
+        if (ver >= 2) {
+          var numAlign = Math.floor(ver / 7) + 2;
+          result -= (25 * numAlign - 10) * numAlign - 55;
+          if (ver >= 7) result -= 36;
+        }
+        return result;
+      }
+
+      function getNumDataCodewords(ver, ecl) {
+        return Math.floor(getNumRawDataModules(ver) / 8) -
+          ECC_CODEWORDS_PER_BLOCK[ecl.ordinal][ver] * NUM_ERROR_CORRECTION_BLOCKS[ecl.ordinal][ver];
+      }
+
+      function charCountBits(ver) { return ver < 10 ? 8 : 16; }
+
+      function toUtf8(str) {
+        if (typeof TextEncoder !== "undefined") return Array.prototype.slice.call(new TextEncoder().encode(str));
+        var s = unescape(encodeURIComponent(str)), out = [];
+        for (var i = 0; i < s.length; i++) out.push(s.charCodeAt(i));
+        return out;
+      }
+
+      // ---- Reed–Solomon ----
+      function rsMultiply(x, y) {
+        var z = 0;
+        for (var i = 7; i >= 0; i--) {
+          z = (z << 1) ^ ((z >>> 7) * 0x11D);
+          z ^= ((y >>> i) & 1) * x;
+        }
+        return z;
+      }
+      function rsComputeDivisor(degree) {
+        var result = [];
+        for (var i = 0; i < degree - 1; i++) result.push(0);
+        result.push(1);
+        var root = 1;
+        for (var i = 0; i < degree; i++) {
+          for (var j = 0; j < result.length; j++) {
+            result[j] = rsMultiply(result[j], root);
+            if (j + 1 < result.length) result[j] ^= result[j + 1];
+          }
+          root = rsMultiply(root, 0x02);
+        }
+        return result;
+      }
+      function rsComputeRemainder(data, divisor) {
+        var result = divisor.map(function () { return 0; });
+        data.forEach(function (b) {
+          var factor = b ^ result.shift();
+          result.push(0);
+          divisor.forEach(function (coef, i) { result[i] ^= rsMultiply(coef, factor); });
+        });
+        return result;
+      }
+
+      // ---- Construcción de la matriz ----
+      function QrCode(ver, ecl, dataCodewords, msk) {
+        var size = ver * 4 + 17;
+        var modules = [], isFunction = [];
+        for (var i = 0; i < size; i++) {
+          modules.push(new Array(size).fill(false));
+          isFunction.push(new Array(size).fill(false));
+        }
+        this.version = ver;
+        this.size = size;
+        this.errorCorrectionLevel = ecl;
+
+        function setFunctionModule(x, y, isDark) {
+          modules[y][x] = isDark;
+          isFunction[y][x] = true;
+        }
+
+        function drawFinderPattern(x, y) {
+          for (var dy = -4; dy <= 4; dy++) {
+            for (var dx = -4; dx <= 4; dx++) {
+              var dist = Math.max(Math.abs(dx), Math.abs(dy));
+              var xx = x + dx, yy = y + dy;
+              if (xx >= 0 && xx < size && yy >= 0 && yy < size)
+                setFunctionModule(xx, yy, dist !== 2 && dist !== 4);
+            }
+          }
+        }
+
+        function drawAlignmentPattern(x, y) {
+          for (var dy = -2; dy <= 2; dy++)
+            for (var dx = -2; dx <= 2; dx++)
+              setFunctionModule(x + dx, y + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+        }
+
+        function getAlignmentPatternPositions() {
+          if (ver === 1) return [];
+          var numAlign = Math.floor(ver / 7) + 2;
+          var step = (ver === 32) ? 26 : Math.ceil((ver * 4 + 4) / (numAlign * 2 - 2)) * 2;
+          var result = [6];
+          for (var pos = size - 7; result.length < numAlign; pos -= step) result.splice(1, 0, pos);
+          return result;
+        }
+
+        function drawFormatBits(mask) {
+          var data = (ecl.formatBits << 3) | mask;
+          var rem = data;
+          for (var i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+          var bits = ((data << 10) | rem) ^ 0x5412;
+
+          for (var i = 0; i <= 5; i++) setFunctionModule(8, i, getBit(bits, i));
+          setFunctionModule(8, 7, getBit(bits, 6));
+          setFunctionModule(8, 8, getBit(bits, 7));
+          setFunctionModule(7, 8, getBit(bits, 8));
+          for (var i = 9; i < 15; i++) setFunctionModule(14 - i, 8, getBit(bits, i));
+
+          for (var i = 0; i < 8; i++) setFunctionModule(size - 1 - i, 8, getBit(bits, i));
+          for (var i = 8; i < 15; i++) setFunctionModule(8, size - 15 + i, getBit(bits, i));
+          setFunctionModule(8, size - 8, true);
+        }
+
+        function drawVersion() {
+          if (ver < 7) return;
+          var rem = ver;
+          for (var i = 0; i < 12; i++) rem = (rem << 1) ^ ((rem >>> 11) * 0x1F25);
+          var bits = (ver << 12) | rem;
+          for (var i = 0; i < 18; i++) {
+            var color = getBit(bits, i);
+            var a = size - 11 + i % 3;
+            var b = Math.floor(i / 3);
+            setFunctionModule(a, b, color);
+            setFunctionModule(b, a, color);
+          }
+        }
+
+        function drawFunctionPatterns() {
+          for (var i = 0; i < size; i++) {
+            setFunctionModule(6, i, i % 2 === 0);
+            setFunctionModule(i, 6, i % 2 === 0);
+          }
+          drawFinderPattern(3, 3);
+          drawFinderPattern(size - 4, 3);
+          drawFinderPattern(3, size - 4);
+
+          var alignPos = getAlignmentPatternPositions();
+          var n = alignPos.length;
+          for (var i = 0; i < n; i++) {
+            for (var j = 0; j < n; j++) {
+              if (!((i === 0 && j === 0) || (i === 0 && j === n - 1) || (i === n - 1 && j === 0)))
+                drawAlignmentPattern(alignPos[i], alignPos[j]);
+            }
+          }
+          drawFormatBits(0); // marcador; se reescribe al final
+          drawVersion();
+        }
+
+        function addEccAndInterleave(data) {
+          var numBlocks = NUM_ERROR_CORRECTION_BLOCKS[ecl.ordinal][ver];
+          var blockEccLen = ECC_CODEWORDS_PER_BLOCK[ecl.ordinal][ver];
+          var rawCodewords = Math.floor(getNumRawDataModules(ver) / 8);
+          var numShortBlocks = numBlocks - rawCodewords % numBlocks;
+          var shortBlockLen = Math.floor(rawCodewords / numBlocks);
+
+          var blocks = [];
+          var rsDiv = rsComputeDivisor(blockEccLen);
+          for (var i = 0, k = 0; i < numBlocks; i++) {
+            var dat = data.slice(k, k + shortBlockLen - blockEccLen + (i < numShortBlocks ? 0 : 1));
+            k += dat.length;
+            var ecc = rsComputeRemainder(dat, rsDiv);
+            if (i < numShortBlocks) dat.push(0);
+            blocks.push(dat.concat(ecc));
+          }
+
+          var result = [];
+          for (var i = 0; i < blocks[0].length; i++) {
+            for (var j = 0; j < blocks.length; j++) {
+              if (i !== shortBlockLen - blockEccLen || j >= numShortBlocks) result.push(blocks[j][i]);
+            }
+          }
+          return result;
+        }
+
+        function drawCodewords(data) {
+          var i = 0;
+          for (var right = size - 1; right >= 1; right -= 2) {
+            if (right === 6) right = 5;
+            for (var vert = 0; vert < size; vert++) {
+              for (var j = 0; j < 2; j++) {
+                var x = right - j;
+                var upward = ((right + 1) & 2) === 0;
+                var y = upward ? size - 1 - vert : vert;
+                if (!isFunction[y][x] && i < data.length * 8) {
+                  modules[y][x] = getBit(data[i >>> 3], 7 - (i & 7));
+                  i++;
+                }
+              }
+            }
+          }
+        }
+
+        function applyMask(mask) {
+          for (var y = 0; y < size; y++) {
+            for (var x = 0; x < size; x++) {
+              var invert;
+              switch (mask) {
+                case 0: invert = (x + y) % 2 === 0; break;
+                case 1: invert = y % 2 === 0; break;
+                case 2: invert = x % 3 === 0; break;
+                case 3: invert = (x + y) % 3 === 0; break;
+                case 4: invert = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0; break;
+                case 5: invert = x * y % 2 + x * y % 3 === 0; break;
+                case 6: invert = (x * y % 2 + x * y % 3) % 2 === 0; break;
+                case 7: invert = ((x + y) % 2 + x * y % 3) % 2 === 0; break;
+              }
+              if (!isFunction[y][x] && invert) modules[y][x] = !modules[y][x];
+            }
+          }
+        }
+
+        // --- Penalización (para elegir la mejor máscara) ---
+        function finderPenaltyAddHistory(len, hist) {
+          if (hist[0] === 0) len += size;
+          hist.pop();
+          hist.unshift(len);
+        }
+        function finderPenaltyCountPatterns(h) {
+          var n = h[1];
+          var core = n > 0 && h[2] === n && h[3] === n * 3 && h[4] === n && h[5] === n;
+          return (core && h[0] >= n * 4 && h[6] >= n ? 1 : 0) + (core && h[6] >= n * 4 && h[0] >= n ? 1 : 0);
+        }
+        function finderPenaltyTerminateAndCount(color, len, hist) {
+          if (color) { finderPenaltyAddHistory(len, hist); len = 0; }
+          len += size;
+          finderPenaltyAddHistory(len, hist);
+          return finderPenaltyCountPatterns(hist);
+        }
+        function getPenaltyScore() {
+          var result = 0;
+          for (var y = 0; y < size; y++) {
+            var runColor = false, runX = 0, hist = [0, 0, 0, 0, 0, 0, 0];
+            for (var x = 0; x < size; x++) {
+              if (modules[y][x] === runColor) {
+                runX++;
+                if (runX === 5) result += 3; else if (runX > 5) result++;
+              } else {
+                finderPenaltyAddHistory(runX, hist);
+                if (!runColor) result += finderPenaltyCountPatterns(hist) * 40;
+                runColor = modules[y][x];
+                runX = 1;
+              }
+            }
+            result += finderPenaltyTerminateAndCount(runColor, runX, hist) * 40;
+          }
+          for (var x = 0; x < size; x++) {
+            var runColor = false, runY = 0, hist = [0, 0, 0, 0, 0, 0, 0];
+            for (var y = 0; y < size; y++) {
+              if (modules[y][x] === runColor) {
+                runY++;
+                if (runY === 5) result += 3; else if (runY > 5) result++;
+              } else {
+                finderPenaltyAddHistory(runY, hist);
+                if (!runColor) result += finderPenaltyCountPatterns(hist) * 40;
+                runColor = modules[y][x];
+                runY = 1;
+              }
+            }
+            result += finderPenaltyTerminateAndCount(runColor, runY, hist) * 40;
+          }
+          for (var y = 0; y < size - 1; y++) {
+            for (var x = 0; x < size - 1; x++) {
+              var c = modules[y][x];
+              if (c === modules[y][x + 1] && c === modules[y + 1][x] && c === modules[y + 1][x + 1]) result += 3;
+            }
+          }
+          var dark = 0;
+          for (var y = 0; y < size; y++) for (var x = 0; x < size; x++) if (modules[y][x]) dark++;
+          var total = size * size;
+          var k = Math.ceil(Math.abs(dark * 20 - total * 10) / total) - 1;
+          result += k * 10;
+          return result;
+        }
+
+        drawFunctionPatterns();
+        drawCodewords(addEccAndInterleave(dataCodewords));
+
+        if (msk === -1) {
+          var minPenalty = Infinity;
+          for (var m = 0; m < 8; m++) {
+            applyMask(m);
+            drawFormatBits(m);
+            var p = getPenaltyScore();
+            if (p < minPenalty) { msk = m; minPenalty = p; }
+            applyMask(m); // deshacer (XOR)
+          }
+        }
+        applyMask(msk);
+        drawFormatBits(msk);
+        this.mask = msk;
+        this.modules = modules;
+      }
+
+      QrCode.prototype.getModule = function (x, y) {
+        return x >= 0 && x < this.size && y >= 0 && y < this.size && this.modules[y][x];
+      };
+
+      function encodeText(text, ecl, boostEcl) {
+        var data = toUtf8(text);
+        var version, dataUsedBits;
+        for (version = 1; ; version++) {
+          var capacityBits = getNumDataCodewords(version, ecl) * 8;
+          dataUsedBits = 4 + charCountBits(version) + data.length * 8;
+          if (dataUsedBits <= capacityBits) break;
+          if (version >= 40) throw new Error("Datos demasiado largos para un código QR");
+        }
+        if (boostEcl !== false) {
+          [Ecc.MEDIUM, Ecc.QUARTILE, Ecc.HIGH].forEach(function (newEcl) {
+            if (dataUsedBits <= getNumDataCodewords(version, newEcl) * 8) ecl = newEcl;
+          });
+        }
+
+        var bb = [];
+        appendBits(0x4, 4, bb);
+        appendBits(data.length, charCountBits(version), bb);
+        data.forEach(function (b) { appendBits(b, 8, bb); });
+
+        var capacityBits = getNumDataCodewords(version, ecl) * 8;
+        appendBits(0, Math.min(4, capacityBits - bb.length), bb);
+        appendBits(0, (8 - bb.length % 8) % 8, bb);
+        for (var pad = 0xEC; bb.length < capacityBits; pad ^= 0xEC ^ 0x11) appendBits(pad, 8, bb);
+
+        var codewords = [];
+        while (codewords.length * 8 < bb.length) codewords.push(0);
+        bb.forEach(function (b, i) { codewords[i >>> 3] |= b << (7 - (i & 7)); });
+
+        return new QrCode(version, ecl, codewords, -1);
+      }
+
+      return { Ecc: Ecc, encodeText: encodeText };
+    })();
+  </script>
+
+  <!-- Lógica de Interfaz -->
+  <script>
+    (function () {
+      "use strict";
+      var $ = function (id) { return document.getElementById(id); };
+      var FIELDS = ['firstName', 'lastName', 'phone', 'email', 'org', 'title',
+                    'social_website', 'social_linkedin', 'social_instagram'];
+      var STORAGE_KEY = 'tarjetasvr:v2';
+      var canvas = $('qrCanvas');
+      var statusEl = $('status');
+      var loadedLogo = null;
+      var currentQr = null;
+
+      var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+      // ---------- Persistencia local (se recuerdan los datos sin conexión) ----------
+      var SETTINGS = ['bgColor', 'fgColor', 'logoSize'];
+      var LOGO_KEY = 'tarjetasvr:logo';
+
+      function save() {
+        try {
+          var data = {};
+          FIELDS.concat(SETTINGS).forEach(function (id) { data[id] = $(id).value; });
+          data.logoRound = $('logoRound').checked;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        } catch (e) {}
+      }
+      function restore() {
+        try {
+          var data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+          FIELDS.concat(SETTINGS).forEach(function (id) { if (typeof data[id] === 'string') $(id).value = data[id]; });
+          $('logoRound').checked = !!data.logoRound;
+        } catch (e) {}
+      }
+      // La imagen se guarda reducida (512px) para recordarla también sin conexión
+      function saveLogo(img) {
+        try {
+          if (!img) { localStorage.removeItem(LOGO_KEY); return; }
+          var max = 512, iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+          var r = Math.min(1, max / Math.max(iw, ih));
+          var c = document.createElement('canvas');
+          c.width = Math.round(iw * r); c.height = Math.round(ih * r);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          localStorage.setItem(LOGO_KEY, c.toDataURL('image/png'));
+        } catch (e) {}
+      }
+      function restoreLogo() {
+        try {
+          var src = localStorage.getItem(LOGO_KEY);
+          if (!src) return;
+          var img = new Image();
+          img.onload = function () { loadedLogo = img; renderQR(); };
+          img.src = src;
+        } catch (e) {}
+      }
+
+      // ---------- Colores y contraste ----------
+      function luminance(hex) {
+        var n = parseInt(hex.slice(1), 16);
+        return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(function (c) {
+          c /= 255;
+          return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+        }).reduce(function (s, c, i) { return s + c * [0.2126, 0.7152, 0.0722][i]; }, 0);
+      }
+      function updateColorUi() {
+        var bg = $('bgColor').value, fg = $('fgColor').value;
+        $('bgColorVal').textContent = bg.toUpperCase();
+        $('fgColorVal').textContent = fg.toUpperCase();
+        $('logoSizeVal').textContent = $('logoSize').value;
+        document.querySelector('.qr-container').style.background = bg;
+        var lb = luminance(bg), lf = luminance(fg);
+        var ratio = (Math.max(lb, lf) + 0.05) / (Math.min(lb, lf) + 0.05);
+        var msg = $('contrastMsg');
+        if (lf >= lb) {
+          msg.className = 'status warn';
+          msg.textContent = '⚠️ El código debe ser más oscuro que el fondo. Muchos lectores (incluida la cámara del iPhone) no leen QR invertidos.';
+        } else if (ratio < 4) {
+          msg.className = 'status warn';
+          msg.textContent = '⚠️ Poco contraste entre colores: el QR puede costar leerlo. Usa un fondo más claro o un código más oscuro.';
+        } else {
+          msg.className = 'status';
+          msg.textContent = 'Contraste correcto ✓';
+        }
+      }
+
+      // ---------- vCard ----------
+      function esc(v) {
+        return String(v).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
+      }
+      function normalizeUrl(v) {
+        v = v.trim();
+        if (!v) return '';
+        return /^[a-z][a-z0-9+.-]*:\/\//i.test(v) ? v : 'https://' + v;
+      }
+      function socialUrl(v, base) {
+        v = v.trim();
+        if (!v) return '';
+        if (/^https?:\/\//i.test(v)) return v;
+        if (/^(www\.)?[a-z0-9-]+\.[a-z]{2,}\//i.test(v)) return 'https://' + v;
+        return base + v.replace(/^@/, '').replace(/^\/+/, '');
+      }
+
+      function buildVCardString() {
+        var v = {};
+        FIELDS.forEach(function (id) { v[id] = $(id).value.trim(); });
+        var fullName = [v.firstName, v.lastName].filter(Boolean).join(' ') || v.org || 'Contacto';
+        var web = normalizeUrl(v.social_website);
+        var linkedin = socialUrl(v.social_linkedin, 'https://www.linkedin.com/in/');
+        var instagram = socialUrl(v.social_instagram, 'https://www.instagram.com/');
+
+        var lines = [
+          'BEGIN:VCARD',
+          'VERSION:3.0',
+          'N:' + esc(v.lastName) + ';' + esc(v.firstName) + ';;;',
+          'FN:' + esc(fullName)
+        ];
+        if (v.org) lines.push('ORG:' + esc(v.org));
+        if (v.title) lines.push('TITLE:' + esc(v.title));
+        if (v.phone) lines.push('TEL;TYPE=CELL:' + v.phone.replace(/[^\d+]/g, ''));
+        if (v.email) lines.push('EMAIL;TYPE=INTERNET:' + v.email);
+        if (web) lines.push('URL:' + web);
+        if (linkedin) lines.push('X-SOCIALPROFILE;TYPE=linkedin:' + linkedin);
+        if (instagram) lines.push('X-SOCIALPROFILE;TYPE=instagram:' + instagram);
+        lines.push('END:VCARD');
+        return lines.join('\r\n');
+      }
+
+      // ---------- Dibujo ----------
+      function roundRectPath(ctx, x, y, w, h, r) {
+        // ctx.roundRect no existe en iOS < 16: lo dibujamos a mano
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+      }
+
+      function drawQr(targetCanvas, qr, pixelSize) {
+        var border = 4; // zona de silencio estándar
+        var total = qr.size + border * 2;
+        var scale = Math.max(1, Math.floor(pixelSize / total));
+        var dim = total * scale;
+        targetCanvas.width = dim;
+        targetCanvas.height = dim;
+        var bg = $('bgColor').value, fg = $('fgColor').value;
+        var ctx = targetCanvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, dim, dim);
+        ctx.fillStyle = fg;
+        for (var y = 0; y < qr.size; y++)
+          for (var x = 0; x < qr.size; x++)
+            if (qr.getModule(x, y)) ctx.fillRect((x + border) * scale, (y + border) * scale, scale, scale);
+
+        if (loadedLogo) {
+          ctx.imageSmoothingEnabled = true;
+          var qrPx = qr.size * scale;
+          var round = $('logoRound').checked;
+          var box = Math.round(qrPx * Number($('logoSize').value) / 100);
+          var pad = Math.max(2, Math.round(scale * 1.2));
+          var pos = Math.round((dim - box) / 2);
+          var cx = dim / 2;
+          // Marco del color de fondo alrededor de la imagen
+          ctx.fillStyle = bg;
+          if (round) {
+            ctx.beginPath();
+            ctx.arc(cx, cx, box / 2 + pad, 0, Math.PI * 2);
+          } else {
+            roundRectPath(ctx, pos - pad, pos - pad, box + pad * 2, box + pad * 2, pad * 2);
+          }
+          ctx.fill();
+          var iw = loadedLogo.naturalWidth || loadedLogo.width;
+          var ih = loadedLogo.naturalHeight || loadedLogo.height;
+          ctx.save();
+          if (round) {
+            // Recorte circular: la imagen llena el círculo
+            ctx.beginPath();
+            ctx.arc(cx, cx, box / 2, 0, Math.PI * 2);
+            ctx.clip();
+            var rc = Math.max(box / iw, box / ih);
+            ctx.drawImage(loadedLogo, cx - iw * rc / 2, cx - ih * rc / 2, iw * rc, ih * rc);
+          } else {
+            var r = Math.min(box / iw, box / ih);
+            var w = iw * r, h = ih * r;
+            ctx.drawImage(loadedLogo, pos + (box - w) / 2, pos + (box - h) / 2, w, h);
+          }
+          ctx.restore();
+        }
+      }
+
+      function renderQR() {
+        save();
+        updateColorUi();
+        try {
+          // Con logo se fuerza nivel H (30 % de corrección) para que el logo no impida la lectura
+          var ecl = loadedLogo ? qrcodegen.Ecc.HIGH : qrcodegen.Ecc.MEDIUM;
+          currentQr = qrcodegen.encodeText(buildVCardString(), ecl, true);
+          drawQr(canvas, currentQr, 640);
+          statusEl.className = 'status';
+          statusEl.textContent = 'QR versión ' + currentQr.version + ' · ' + currentQr.size + '×' + currentQr.size + ' módulos';
+        } catch (e) {
+          currentQr = null;
+          statusEl.className = 'status error';
+          statusEl.textContent = 'Error: ' + (e && e.message ? e.message : e);
+        }
+      }
+
+      // ---------- Guardar / compartir ----------
+      function canvasToBlob(c) {
+        return new Promise(function (resolve) {
+          if (c.toBlob) c.toBlob(resolve, 'image/png');
+          else {
+            var bin = atob(c.toDataURL('image/png').split(',')[1]), arr = new Uint8Array(bin.length);
+            for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+            resolve(new Blob([arr], { type: 'image/png' }));
+          }
+        });
+      }
+
+      function tryShareFile(blob, filename) {
+        if (!navigator.share || !navigator.canShare || typeof File === 'undefined') return Promise.resolve(false);
+        var file = new File([blob], filename, { type: blob.type });
+        if (!navigator.canShare({ files: [file] })) return Promise.resolve(false);
+        return navigator.share({ files: [file] }).then(function () { return true; }, function (err) {
+          // AbortError = el usuario cerró la hoja de compartir: no hacer nada más
+          return err && err.name === 'AbortError';
+        });
+      }
+
+      function downloadBlob(blob, filename) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      }
+
+      function fileBase() {
+        var name = [$('firstName').value, $('lastName').value].join(' ').trim() || 'contacto';
+        return name.normalize ? name.normalize('NFD').replace(/[\u0300-\u036f]/g, '') .replace(/[^\w-]+/g, '_') : 'contacto';
+      }
+
+      $('downloadPngBtn').addEventListener('click', function () {
+        if (!currentQr) return;
+        var hi = document.createElement('canvas');
+        drawQr(hi, currentQr, 1200);
+        var filename = fileBase() + '-qr.png';
+        if (isIOS) {
+          canvasToBlob(hi).then(function (blob) {
+            return tryShareFile(blob, filename);
+          }).then(function (shared) {
+            if (!shared) {
+              // Plan B en iPhone: mostrar la imagen para "mantener pulsado → Guardar en Fotos"
+              $('saveImg').src = hi.toDataURL('image/png');
+              $('saveOverlay').classList.add('open');
+            }
+          });
+        } else {
+          canvasToBlob(hi).then(function (blob) { downloadBlob(blob, filename); });
+        }
+      });
+
+      $('closeOverlayBtn').addEventListener('click', function () { $('saveOverlay').classList.remove('open'); });
+
+      $('downloadVcfBtn').addEventListener('click', function () {
+        var vcard = buildVCardString();
+        var filename = fileBase() + '.vcf';
+        if (isIOS) {
+          // En iPhone, abrir la vCard muestra directamente la ficha "Crear contacto nuevo"
+          window.location.href = 'data:text/vcard;charset=utf-8,' + encodeURIComponent(vcard);
+        } else {
+          downloadBlob(new Blob([vcard], { type: 'text/vcard;charset=utf-8' }), filename);
+        }
+      });
+
+      // ---------- Logo ----------
+      $('logoInput').addEventListener('change', function (e) {
+        var file = e.target.files && e.target.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function (evt) {
+          var img = new Image();
+          img.onload = function () { loadedLogo = img; saveLogo(img); renderQR(); };
+          img.onerror = function () {
+            statusEl.className = 'status error';
+            statusEl.textContent = 'No se pudo leer la imagen (prueba con JPG o PNG).';
+          };
+          img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+      $('clearLogoBtn').addEventListener('click', function () {
+        loadedLogo = null;
+        saveLogo(null);
+        $('logoInput').value = '';
+        renderQR();
+      });
+
+      FIELDS.concat(SETTINGS).forEach(function (id) { $(id).addEventListener('input', renderQR); });
+      $('logoRound').addEventListener('change', renderQR);
+      Array.prototype.forEach.call(document.querySelectorAll('#presets button'), function (b) {
+        b.addEventListener('click', function () {
+          $('bgColor').value = b.getAttribute('data-bg');
+          $('fgColor').value = b.getAttribute('data-fg');
+          renderQR();
+        });
+      });
+
+      restore();
+      renderQR();
+      restoreLogo();
+
+      // ---------- Modo offline (solo si se sirve por https con sw.js al lado) ----------
+      if ('serviceWorker' in navigator && location.protocol === 'https:') {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      }
+
+      // Exponer para pruebas
+      window.__buildVCardString = buildVCardString;
+    })();
+  </script>
+</body>
+</html>
