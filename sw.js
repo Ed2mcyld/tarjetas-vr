@@ -1,5 +1,5 @@
 // Service worker: red primero (para recibir actualizaciones) y caché cuando no hay conexión.
-const CACHE = 'tarjetasvr-v6';
+const CACHE = 'tarjetasvr-v7';
 const FILES = ['./', './index.html', './manifest.json', './icon.png'];
 
 self.addEventListener('install', e => {
